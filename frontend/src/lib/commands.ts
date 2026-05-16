@@ -42,6 +42,7 @@ export interface POI {
   distance_m: number
   direction: Direction
   category: Category
+  description?: string
   rating?: number
   user_ratings_total?: number
   price_level?: number

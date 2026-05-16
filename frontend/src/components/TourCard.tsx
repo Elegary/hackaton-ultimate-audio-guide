@@ -59,6 +59,10 @@ export default function TourCard() {
           </span>
         </div>
 
+        {poi.description && (
+          <p className="tour-card__description">{poi.description}</p>
+        )}
+
         <dl className="tour-card__meta">
           {typeof poi.rating === 'number' && (
             <div>
