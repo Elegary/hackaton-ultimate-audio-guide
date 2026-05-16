@@ -4,4 +4,6 @@ version = "0.1.0"
 description = "The backend of the ultimate audio guide made in the Paris AI Hackaton"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi[standard]>=0.136.1",
+]
