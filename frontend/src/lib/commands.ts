@@ -1,6 +1,15 @@
 // ============================================================
-// PROTOCOL VERSION — bump if breaking change
-// Mirror of backend Pydantic models. Any edit here requires a sync call.
+// PROTOCOL VERSION
+//
+// Runtime note: Gradbot owns the WebSocket lifecycle (`start` / `stop`
+// JSON + binary audio frames), and `SyncedAudioPlayer` handles its
+// reserved JSON types (`audio_timing`, `user_text`, `agent_text`,
+// `event`, `error`). The types below describe the CUSTOM events our
+// backend layers on top via `ws_handler.on_event` (front → back) and
+// `tools/*.py -> websocket.send_json` (back → front). Several of the
+// `FrontendCommand` variants below are placeholders kept for V1 parity
+// but not yet emitted by the backend — see `useWebSocket.ts` for the
+// actual wire layer.
 // ============================================================
 export const PROTOCOL_VERSION = 1
 

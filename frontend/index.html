@@ -21,6 +21,11 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Gradbot audio bundle — registers SyncedAudioPlayer as a global.
+         These MUST load before main.tsx; they are NOT ES modules. -->
+    <script src="/static/js/opus-encoder.js"></script>
+    <script src="/static/js/audio-processor.js"></script>
+    <script src="/static/js/synced-audio-player.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

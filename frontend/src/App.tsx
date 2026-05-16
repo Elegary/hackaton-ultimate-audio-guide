@@ -25,13 +25,24 @@ export default function App() {
 
   const wsConnected = useStore((s) => s.wsConnected)
   const sessionReady = useStore((s) => s.sessionReady)
-  const { send } = useWebSocket(sessionId)
 
   const position = geo.fix
     ? { lat: geo.fix.lat, lng: geo.fix.lng, accuracy: geo.fix.accuracy }
     : null
 
-  // Throttled position_update upstream so the backend can drive the cards.
+  // The hook gates the WS on `position` being non-null so the agent gets a
+  // real GPS fix in its first prompt. Subsequent ticks go through `send`.
+  const { send } = useWebSocket({
+    sessionId,
+    initialPosition: position
+      ? { lat: position.lat, lng: position.lng }
+      : null,
+    initialHeading: compass.heading,
+    language: 'fr',
+  })
+
+  // Throttled position_update upstream so the backend keeps an up-to-date
+  // user position for tools that re-search around it.
   usePositionUpload(send, position, compass.heading)
 
   const handleActivate = async () => {
