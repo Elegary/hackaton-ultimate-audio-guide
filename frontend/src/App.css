@@ -173,6 +173,52 @@
   cursor: not-allowed;
 }
 
+.mic-toggle {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  border: 0;
+  background: #1a1a1a;
+  color: #f4ede2;
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.mic-toggle:hover {
+  background: #333;
+}
+
+.mic-toggle.is-muted {
+  background: #c44536;
+  color: #fff;
+}
+
+.mic-toggle.is-muted:hover {
+  background: #a03a2d;
+}
+
+.mic-toggle__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.mic-toggle:not(.is-muted) .mic-toggle__dot {
+  animation: micPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes micPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.7); }
+}
+
 .map-error {
   position: absolute;
   inset: 0;

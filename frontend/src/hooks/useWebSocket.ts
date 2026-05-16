@@ -230,5 +230,18 @@ export function useWebSocket({
     }
   }, [])
 
-  return { send }
+  /** Enable / disable the microphone track without tearing down the
+   * audio pipeline. `muted = true` keeps the encoder running on silence,
+   * so Gradbot just sees the user as quiet — no false interruptions. */
+  const setMicMuted = useCallback((muted: boolean) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const player = playerRef.current as any
+    const stream: MediaStream | undefined = player?.audioProcessor?.mediaStream
+    if (!stream) return
+    for (const track of stream.getAudioTracks()) {
+      track.enabled = !muted
+    }
+  }, [])
+
+  return { send, setMicMuted }
 }

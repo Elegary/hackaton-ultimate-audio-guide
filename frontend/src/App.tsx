@@ -39,7 +39,7 @@ export default function App() {
 
   // The hook gates the WS on `position` being non-null so the agent gets a
   // real GPS fix in its first prompt. Subsequent ticks go through `send`.
-  const { send } = useWebSocket({
+  const { send, setMicMuted } = useWebSocket({
     sessionId,
     initialPosition: position
       ? { lat: position.lat, lng: position.lng }
@@ -47,6 +47,13 @@ export default function App() {
     initialHeading: effectiveHeading,
     language: 'en',
   })
+
+  // Mic mute is just `track.enabled = false` on the MediaStream — keeps the
+  // pipeline alive, Gradbot just sees the user as quiet.
+  const [micMuted, setMicMutedState] = useState(false)
+  useEffect(() => {
+    setMicMuted(micMuted)
+  }, [micMuted, setMicMuted, wsConnected])
 
   // Throttled position_update upstream so the backend keeps an up-to-date
   // user position for tools that re-search around it.
@@ -77,6 +84,17 @@ export default function App() {
         <>
           <TourCard />
           <VoiceCard />
+          {wsConnected && (
+            <button
+              type="button"
+              className={`mic-toggle${micMuted ? ' is-muted' : ''}`}
+              onClick={() => setMicMutedState((m) => !m)}
+              aria-pressed={micMuted}
+            >
+              <span className="mic-toggle__dot" aria-hidden="true" />
+              {micMuted ? 'Mic muted — tap to talk' : 'Mute mic'}
+            </button>
+          )}
           <ActivityQueue />
           <StatusPanel
             geoStatus={geo.status}
