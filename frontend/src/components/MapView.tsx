@@ -3,33 +3,14 @@ import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import { useStore } from '../lib/store'
 import type { POI } from '../lib/commands'
 
-const editorialMapStyle: google.maps.MapTypeStyle[] = [
-  // Strip Google's noise first
-  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-  { featureType: 'road', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+// 3D maps3d types aren't all in @types/google.maps yet — keep these opaque.
+type Anything3D = unknown
 
-  // Paper / land / water
-  { elementType: 'geometry', stylers: [{ color: '#e8a598' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#f4ede2' }] },
-  { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#e8a598' }] },
-  { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#edb0a3' }] },
-
-  // Roads as cream cuts
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#f4ede2' }] },
-  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#d97b6a' }, { weight: 0.5 }] },
-  { featureType: 'road.arterial', elementType: 'geometry.stroke', stylers: [{ visibility: 'off' }] },
-
-  // Type: only major labels, in ink
-  { elementType: 'labels.text.fill', stylers: [{ color: '#1a1a1a' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#f4ede2' }, { weight: 2 }] },
-  { featureType: 'administrative', elementType: 'geometry', stylers: [{ visibility: 'off' }] },
-]
-
-const DEFAULT_CENTER = { lat: 48.8566, lng: 2.3522 } // Paris (placeholder until first fix)
-const DEFAULT_ZOOM = 14
-const FIRST_FIX_ZOOM = 17
+const DEFAULT_CENTER = { lat: 48.8566, lng: 2.3522, altitude: 400 } // Paris
+const DEFAULT_RANGE = 2500
+const DEFAULT_TILT = 65
+const USER_MARKER_ALTITUDE = 2
+const POI_MARKER_ALTITUDE = 5
 
 let optionsConfigured = false
 
@@ -40,11 +21,10 @@ interface MapViewProps {
 
 export default function MapView({ position, heading }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<google.maps.Map | null>(null)
-  const dotMarkerRef = useRef<google.maps.Marker | null>(null)
-  const arrowMarkerRef = useRef<google.maps.Marker | null>(null)
-  const accuracyCircleRef = useRef<google.maps.Circle | null>(null)
-  const poiMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map())
+  const mapRef = useRef<Anything3D>(null)
+  const userMarkerRef = useRef<Anything3D>(null)
+  const poiMarkersRef = useRef<Map<string, Anything3D>>(new Map())
+  const markerCtorRef = useRef<Anything3D>(null)
   const firstFixDoneRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,7 +32,7 @@ export default function MapView({ position, heading }: MapViewProps) {
   const activityQueue = useStore((s) => s.activityQueue)
   const highlightedId = useStore((s) => s.highlightedPoiId)
 
-  // Bootstrap the map once.
+  // Bootstrap the 3D map once.
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     if (!apiKey) {
@@ -63,30 +43,34 @@ export default function MapView({ position, heading }: MapViewProps) {
     const container = containerRef.current
     if (!container) return
 
+    // The 'beta' channel is required for Map3DElement at the moment.
     if (!optionsConfigured) {
-      setOptions({ key: apiKey, v: 'weekly' })
+      setOptions({ key: apiKey, v: 'beta' })
       optionsConfigured = true
     }
 
     let cancelled = false
 
-    importLibrary('maps')
-      .then(({ Map }) => {
+    importLibrary('maps3d')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((lib: any) => {
         if (cancelled) return
-        const map = new Map(container, {
+        const { Map3DElement, Marker3DElement, MapMode } = lib
+        const map3d = new Map3DElement({
           center: DEFAULT_CENTER,
-          zoom: DEFAULT_ZOOM,
-          styles: editorialMapStyle,
-          disableDefaultUI: true,
-          gestureHandling: 'greedy',
-          backgroundColor: '#f4ede2',
-          maxZoom: 18,
-          clickableIcons: false,
+          range: DEFAULT_RANGE,
+          tilt: DEFAULT_TILT,
+          heading: 0,
+          mode: MapMode.HYBRID,
         })
-        mapRef.current = map
+        // replaceChildren makes the mount HMR-safe — wipes any stale element
+        // left behind by a previous render before re-attaching.
+        container.replaceChildren(map3d)
+        mapRef.current = map3d
+        markerCtorRef.current = Marker3DElement
       })
       .catch((e: unknown) => {
-        const msg = e instanceof Error ? e.message : 'Échec du chargement de Google Maps'
+        const msg = e instanceof Error ? e.message : 'Google Maps failed to load'
         setError(msg)
       })
 
@@ -95,93 +79,55 @@ export default function MapView({ position, heading }: MapViewProps) {
     }
   }, [])
 
-  // User position → recenter on first fix, update dot + accuracy circle on every fix.
+  // Recenter on every fix; first fix tightens the camera range.
   useEffect(() => {
-    const map = mapRef.current
+    const map = mapRef.current as { center: unknown; range: number } | null
     if (!map || !position) return
 
-    const latLng = { lat: position.lat, lng: position.lng }
+    map.center = { lat: position.lat, lng: position.lng, altitude: 400 }
 
     if (!firstFixDoneRef.current) {
-      map.panTo(latLng)
-      map.setZoom(FIRST_FIX_ZOOM)
+      map.range = DEFAULT_RANGE
       firstFixDoneRef.current = true
     }
 
-    if (!dotMarkerRef.current) {
-      dotMarkerRef.current = new google.maps.Marker({
-        position: latLng,
-        map,
-        zIndex: 30,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#c44536',
-          fillOpacity: 1,
-          strokeColor: '#f4ede2',
-          strokeWeight: 3,
-          scale: 7,
-        },
-      })
-    } else {
-      dotMarkerRef.current.setPosition(latLng)
+    // Drop / move the user marker
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const MarkerCtor = markerCtorRef.current as any
+    if (!MarkerCtor) return
+    const markerPos = {
+      lat: position.lat,
+      lng: position.lng,
+      altitude: USER_MARKER_ALTITUDE,
     }
-
-    if (typeof position.accuracy === 'number') {
-      if (!accuracyCircleRef.current) {
-        accuracyCircleRef.current = new google.maps.Circle({
-          map,
-          center: latLng,
-          radius: position.accuracy,
-          fillColor: '#c44536',
-          fillOpacity: 0.08,
-          strokeColor: '#c44536',
-          strokeOpacity: 0.25,
-          strokeWeight: 1,
-          clickable: false,
-          zIndex: 10,
-        })
-      } else {
-        accuracyCircleRef.current.setCenter(latLng)
-        accuracyCircleRef.current.setRadius(position.accuracy)
-      }
+    if (!userMarkerRef.current) {
+      const m = new MarkerCtor({
+        position: markerPos,
+        label: 'You',
+        altitudeMode: 'RELATIVE_TO_GROUND',
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(map as any).append(m)
+      userMarkerRef.current = m
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(userMarkerRef.current as any).position = markerPos
     }
   }, [position])
 
-  // User heading → rotate arrow marker.
+  // Heading drives the camera rotation.
+  useEffect(() => {
+    const map = mapRef.current as { heading: number } | null
+    if (!map || heading === null) return
+    map.heading = heading
+  }, [heading])
+
+  // Sync POI markers with the store (current card + queue).
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !position || heading === null) return
-
-    const latLng = { lat: position.lat, lng: position.lng }
-    const icon: google.maps.Symbol = {
-      path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-      fillColor: '#1a1a1a',
-      fillOpacity: 1,
-      strokeColor: '#1a1a1a',
-      strokeWeight: 1,
-      scale: 4,
-      rotation: heading,
-      anchor: new google.maps.Point(0, 4),
-    }
-
-    if (!arrowMarkerRef.current) {
-      arrowMarkerRef.current = new google.maps.Marker({
-        position: latLng,
-        map,
-        icon,
-        zIndex: 40,
-        clickable: false,
-      })
-    } else {
-      arrowMarkerRef.current.setPosition(latLng)
-      arrowMarkerRef.current.setIcon(icon)
-    }
-  }, [position, heading])
-
-  // POIs from store (current card + queue) → ink markers on the map.
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const MarkerCtor = markerCtorRef.current as any
+    if (!map || !MarkerCtor) return
 
     const allPois: POI[] = [
       ...(currentCard ? [currentCard] : []),
@@ -191,39 +137,34 @@ export default function MapView({ position, heading }: MapViewProps) {
 
     for (const poi of allPois) {
       seen.add(poi.id)
-      const isFocus = poi.id === currentCard?.id
-      const isHighlight = poi.id === highlightedId
-
-      const icon: google.maps.Symbol = {
-        path: google.maps.SymbolPath.CIRCLE,
-        fillColor: isFocus ? '#1a1a1a' : '#f4ede2',
-        fillOpacity: 1,
-        strokeColor: '#1a1a1a',
-        strokeWeight: isHighlight ? 3 : 2,
-        scale: isFocus ? 7 : 5,
+      const pos = {
+        lat: poi.lat,
+        lng: poi.lng,
+        altitude: POI_MARKER_ALTITUDE,
       }
-
       const existing = poiMarkersRef.current.get(poi.id)
       if (existing) {
-        existing.setPosition({ lat: poi.lat, lng: poi.lng })
-        existing.setIcon(icon)
-        existing.setZIndex(isFocus ? 25 : 20)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const e = existing as any
+        e.position = pos
+        e.label = poi.name
       } else {
-        const marker = new google.maps.Marker({
-          position: { lat: poi.lat, lng: poi.lng },
-          map,
-          icon,
-          title: poi.name,
-          zIndex: isFocus ? 25 : 20,
+        const m = new MarkerCtor({
+          position: pos,
+          label: poi.name,
+          altitudeMode: 'RELATIVE_TO_GROUND',
         })
-        poiMarkersRef.current.set(poi.id, marker)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(map as any).append(m)
+        poiMarkersRef.current.set(poi.id, m)
       }
     }
 
-    // Garbage-collect markers for POIs no longer in the set
+    // Remove markers for POIs no longer in the set.
     for (const [id, marker] of poiMarkersRef.current) {
       if (!seen.has(id)) {
-        marker.setMap(null)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(marker as any).remove?.()
         poiMarkersRef.current.delete(id)
       }
     }
