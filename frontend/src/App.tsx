@@ -30,6 +30,13 @@ export default function App() {
     ? { lat: geo.fix.lat, lng: geo.fix.lng, accuracy: geo.fix.accuracy }
     : null
 
+  // Desktop demo recording: the operator drives a manual heading via the
+  // side panel. `mockHeading: null` means "fall back to the real device
+  // compass" — so on mobile (where the slider is hidden by CSS) the real
+  // compass flows through unchanged.
+  const [mockHeading, setMockHeading] = useState<number | null>(null)
+  const effectiveHeading = mockHeading ?? compass.heading
+
   // The hook gates the WS on `position` being non-null so the agent gets a
   // real GPS fix in its first prompt. Subsequent ticks go through `send`.
   const { send } = useWebSocket({
@@ -37,13 +44,13 @@ export default function App() {
     initialPosition: position
       ? { lat: position.lat, lng: position.lng }
       : null,
-    initialHeading: compass.heading,
+    initialHeading: effectiveHeading,
     language: 'en',
   })
 
   // Throttled position_update upstream so the backend keeps an up-to-date
   // user position for tools that re-search around it.
-  usePositionUpload(send, position, compass.heading)
+  usePositionUpload(send, position, effectiveHeading)
 
   const handleActivate = async () => {
     geo.start()
@@ -63,7 +70,7 @@ export default function App() {
       </header>
 
       <section className="map-section" aria-label="Map">
-        <MapView position={position} heading={compass.heading} />
+        <MapView position={position} heading={effectiveHeading} />
       </section>
 
       {activated ? (
@@ -76,7 +83,7 @@ export default function App() {
             geoError={geo.error}
             accuracy={geo.fix?.accuracy ?? null}
             compassStatus={compass.status}
-            heading={compass.heading}
+            heading={effectiveHeading}
           />
         </>
       ) : (
@@ -86,7 +93,51 @@ export default function App() {
       )}
 
       <footer className="footnote">v0 · Vercel preview · iOS demo</footer>
+
+      <DemoCompass value={mockHeading} onChange={setMockHeading} />
     </main>
+  )
+}
+
+interface DemoCompassProps {
+  value: number | null
+  onChange: (v: number | null) => void
+}
+
+const CARDINALS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+function cardinal(deg: number): string {
+  return CARDINALS[Math.round((deg % 360) / 45) % 8]
+}
+
+function DemoCompass({ value, onChange }: DemoCompassProps) {
+  const sliderValue = value ?? 0
+  const active = value !== null
+  return (
+    <aside className="demo-compass" aria-label="Demo compass">
+      <div className="demo-compass__title">Demo compass</div>
+      <input
+        type="range"
+        min={0}
+        max={359}
+        step={1}
+        value={sliderValue}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        aria-label="Heading degrees"
+      />
+      <div className="demo-compass__readout">
+        {active
+          ? `${sliderValue.toFixed(0)}° (${cardinal(sliderValue)})`
+          : '— (using device)'}
+      </div>
+      <button
+        type="button"
+        className="demo-compass__reset"
+        onClick={() => onChange(null)}
+        disabled={!active}
+      >
+        Use device compass
+      </button>
+    </aside>
   )
 }
 

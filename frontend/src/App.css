@@ -114,6 +114,65 @@
   height: 100%;
 }
 
+/* Desktop-only fake compass panel for demo recording. Hidden on mobile so
+   the real device compass flows through unchanged. */
+.demo-compass {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .demo-compass {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: fixed;
+    top: 50%;
+    right: 24px;
+    transform: translateY(-50%);
+    width: 240px;
+    padding: 18px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    z-index: 50;
+    font-size: 13px;
+  }
+}
+
+.demo-compass__title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--ink-muted, #666);
+}
+
+.demo-compass input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: #c44536;
+}
+
+.demo-compass__readout {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+}
+
+.demo-compass__reset {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.demo-compass__reset:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .map-error {
   position: absolute;
   inset: 0;
