@@ -31,3 +31,11 @@ archive.zip
 
 .codspeed
 .venv
+
+# secrets
+.env
+.env.local
+config.yaml
+
+# vendored gradbot demo references (kept locally for reference, not tracked)
+docs/demos/
