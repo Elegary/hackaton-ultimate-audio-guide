@@ -8,6 +8,7 @@ import httpx
 from loguru import logger
 
 _SUMMARY_MAX_CHARS = 400
+_THUMB_SIZE_PX = 480
 _TIMEOUT_S = 10.0
 # Wikipedia requires a meaningful User-Agent identifying the app + contact.
 _USER_AGENT = (
@@ -19,12 +20,13 @@ TOOL = gradbot.ToolDef(
     "search_nearby_landmarks",
     (
         "Search Wikipedia for notable places (monuments, museums, parks, "
-        "landmarks, churches) within a radius around the user's current "
-        "position. Call this at the very start of the session to ground "
-        "your greeting in a real nearby landmark, and any time the user "
-        "asks what's around them or you need ideas for what to talk "
-        "about next. Results include name, distance, a short summary, "
-        "and a Wikipedia URL."
+        "landmarks, churches) around the user's current position. Always "
+        "returns up to 5 results — the user-facing UI shows all of them, "
+        "so do NOT limit yourself to one. Call this at the very start of "
+        "the session to ground your greeting in a real nearby landmark, "
+        "and any time the user asks what's around them or you need ideas "
+        "for what to talk about next. Results include name, distance, a "
+        "short description, a thumbnail URL, and the Wikipedia URL."
     ),
     json.dumps(
         {
@@ -33,13 +35,8 @@ TOOL = gradbot.ToolDef(
                 "radius_m": {
                     "type": "number",
                     "description": (
-                        "Search radius in meters. Default 500, max 5000."
-                    ),
-                },
-                "limit": {
-                    "type": "number",
-                    "description": (
-                        "Maximum number of results. Default 5, max 10."
+                        "Search radius in meters. Default 500, max 5000. "
+                        "Increase if the user explicitly asks to look further."
                     ),
                 },
             },
@@ -91,10 +88,12 @@ async def run(
             base_url,
             params={
                 "action": "query",
-                "prop": "extracts|info",
+                "prop": "extracts|info|pageimages",
                 "exintro": 1,
                 "explaintext": 1,
                 "inprop": "url",
+                "piprop": "thumbnail",
+                "pithumbsize": _THUMB_SIZE_PX,
                 "pageids": page_ids,
                 "format": "json",
             },
@@ -105,16 +104,18 @@ async def run(
     results: list[dict[str, Any]] = []
     for h in hits:
         page = pages.get(str(h["pageid"]), {})
-        summary = (page.get("extract") or "").strip()
-        if len(summary) > _SUMMARY_MAX_CHARS:
-            summary = summary[:_SUMMARY_MAX_CHARS].rsplit(" ", 1)[0] + "…"
+        description = (page.get("extract") or "").strip()
+        if len(description) > _SUMMARY_MAX_CHARS:
+            description = description[:_SUMMARY_MAX_CHARS].rsplit(" ", 1)[0] + "…"
+        thumb = page.get("thumbnail") or {}
         results.append(
             {
                 "title": h["title"],
                 "lat": h["lat"],
                 "lng": h["lon"],
                 "distance_m": int(h["dist"]),
-                "summary": summary,
+                "description": description,
+                "photo_url": thumb.get("source"),
                 "url": page.get("fullurl")
                 or f"https://{lang}.wikipedia.org/?curid={h['pageid']}",
             }

@@ -33,6 +33,7 @@ class POI(BaseModel):
     distance_m: int
     direction: Direction
     category: Category
+    description: str | None = None
     rating: float | None = None
     user_ratings_total: int | None = None
     price_level: int | None = None
