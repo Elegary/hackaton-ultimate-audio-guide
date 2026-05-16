@@ -38,9 +38,12 @@ export function dispatchCommand(cmd: FrontendCommand) {
       store.setQueue([])
       break
 
-    // Voice — not wired yet
+    // Voice
     case 'voice_state':
+      store.setVoiceState(cmd.state)
+      break
     case 'transcript_chunk':
+      store.appendTranscript({ speaker: cmd.speaker, text: cmd.text })
       break
 
     case 'error':

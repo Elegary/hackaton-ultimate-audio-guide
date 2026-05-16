@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { POI } from './commands'
 import { dispatchCommand } from './command-bus'
+import { useStore } from './store'
 import {
   bearingDeg,
   destinationPoint,
@@ -173,4 +174,83 @@ export function useMockBackend(
     dispatchCommand({ type: 'set_queue', activities: rest.slice(0, QUEUE_SIZE) })
     dispatchCommand({ type: 'switch_view', view: nearest.category === 'monument' ? 'monument' : 'activity' })
   }, [position, heading])
+}
+
+// ============================================================
+// Voice narration mock — replace with backend audio + transcript stream
+// ============================================================
+
+export const AGENT_PERSONA = 'Emma'
+
+const NARRATIONS: Record<string, string> = {
+  'mock:tour-clocher':
+    "Devant vous, la Tour du Vieux Clocher. Bâtie au XIVᵉ siècle, restaurée trois fois — par les dominicains, puis Napoléon III, et enfin en 1947 après l’incendie. C’est le seul beffroi de la rive nord encore visitable. Si vous montez, comptez deux cents marches et une vue à couper le souffle sur les toits.",
+  'mock:cafe-marie':
+    "À votre droite, le Café de Marie. La terrasse prend le soleil le matin et Étienne, le patron, fait son propre pain au levain depuis quinze ans. Demandez-lui de vous montrer sa machine à café — elle vient de Milan, 1962, et elle ronronne toujours.",
+  'mock:galerie-petit-pont':
+    "La Galerie du Petit Pont — photographie contemporaine, accrochage trimestriel, entrée libre. En ce moment ils montrent un travail sur les phares bretons. Largement le détour, même si la lumière y est crue.",
+  'mock:jardin-musiciens':
+    "Le Jardin des Musiciens, presque secret. Bancs en fonte, vieux platanes, et le dimanche, des concerts improvisés. Si vous y passez vers six heures du soir, il y a souvent quelqu’un qui joue du saxophone près de la fontaine.",
+  'mock:librairie-corne':
+    "La Librairie La Corne, juste là. Éditions rares, beaux livres d’art, et un chat tigré qui dort sur la caisse depuis huit ans. Le libraire connaît son fonds par cœur — demandez-lui n’importe quoi, il trouvera.",
+  'mock:bistrot-marquise':
+    "Le Bistrot de la Marquise. Cuisine de bistrot revisitée, carte courte, tables au coude-à-coude. C’est Anaïs qui orchestre tout ça depuis 2019 — sa lotte au safran fait beaucoup parler.",
+}
+
+const THINKING_MS = 700
+const WORD_DELAY_MS = 90
+const LISTEN_HOLD_MS = 1800
+const IDLE_HOLD_MS = 3500
+
+/**
+ * Watches the current card and plays a scripted Emma narration:
+ *   thinking → speaking (word-by-word transcript) → listening → idle
+ *
+ * When the card changes mid-narration, the previous script is cancelled
+ * and a fresh one starts. Replace with backend audio + transcript stream.
+ */
+export function useMockVoice() {
+  const cardId = useStore((s) => s.currentCard?.id ?? null)
+  const cardName = useStore((s) => s.currentCard?.name ?? null)
+
+  useEffect(() => {
+    if (!cardId) return
+
+    const text =
+      NARRATIONS[cardId] ??
+      `${cardName ?? 'Un lieu intéressant'} se trouve juste à côté. On continue ?`
+    const words = text.split(/(\s+)/) // keep whitespace so chunks reassemble cleanly
+
+    let cancelled = false
+    const timers: number[] = []
+    const schedule = (delay: number, fn: () => void) => {
+      timers.push(window.setTimeout(() => {
+        if (!cancelled) fn()
+      }, delay))
+    }
+
+    dispatchCommand({ type: 'voice_state', state: 'thinking' })
+
+    schedule(THINKING_MS, () => {
+      dispatchCommand({ type: 'voice_state', state: 'speaking' })
+      words.forEach((w, i) => {
+        schedule(i * WORD_DELAY_MS, () => {
+          dispatchCommand({ type: 'transcript_chunk', text: w, speaker: 'agent' })
+        })
+      })
+
+      const totalSpeechMs = words.length * WORD_DELAY_MS
+      schedule(totalSpeechMs + LISTEN_HOLD_MS, () => {
+        dispatchCommand({ type: 'voice_state', state: 'listening' })
+      })
+      schedule(totalSpeechMs + LISTEN_HOLD_MS + IDLE_HOLD_MS, () => {
+        dispatchCommand({ type: 'voice_state', state: 'idle' })
+      })
+    })
+
+    return () => {
+      cancelled = true
+      timers.forEach((t) => window.clearTimeout(t))
+    }
+  }, [cardId, cardName])
 }

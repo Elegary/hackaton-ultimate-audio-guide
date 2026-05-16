@@ -2,9 +2,10 @@ import './App.css'
 import MapView from './components/MapView'
 import TourCard from './components/TourCard'
 import ActivityQueue from './components/ActivityQueue'
+import VoiceCard from './components/VoiceCard'
 import { useGeolocation, type GeoStatus } from './hooks/useGeolocation'
 import { useCompass, type CompassStatus } from './hooks/useCompass'
-import { useMockBackend } from './lib/mock-backend'
+import { useMockBackend, useMockVoice } from './lib/mock-backend'
 
 export default function App() {
   const geo = useGeolocation()
@@ -22,6 +23,7 @@ export default function App() {
 
   // Mock backend mirrors the eventual WebSocket: dispatchCommand on position+heading.
   useMockBackend(position, compass.heading)
+  useMockVoice()
 
   const activated = geo.status !== 'idle' || compass.status !== 'idle'
 
@@ -40,6 +42,7 @@ export default function App() {
       {activated ? (
         <>
           <TourCard />
+          <VoiceCard />
           <ActivityQueue />
           <StatusPanel
             geoStatus={geo.status}
