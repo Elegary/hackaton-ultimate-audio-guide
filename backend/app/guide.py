@@ -13,10 +13,14 @@ from app import geo
 from app.models import POI, ClearCard, ClearQueue, DisplayCard, SetQueue
 from app.tools import wikipedia as wiki_tool
 
-# Emma — English female voice. Swap via /api/voices catalog if needed.
-DEFAULT_VOICE_ID = "YTpq7expH9539ERJ"
+# Voice + prompt are picked from these tables based on state.language.
+# Voice IDs come from Gradium's catalogue (cf. /api/voices).
+VOICES_BY_LANG: dict[str, str] = {
+    "en": "YTpq7expH9539ERJ",  # Emma — English female
+    "fr": "axlOaUiFyOZhy4nv",  # Guillaume — French male
+}
 
-SYSTEM_PROMPT = """You are a warm, knowledgeable audio guide on a phone call.
+SYSTEM_PROMPT_EN = """You are a warm, knowledgeable audio guide on a phone call.
 
 The user just connected. You know their GPS coordinates:
 - latitude: {lat}
@@ -67,6 +71,65 @@ Always use `direction` and round `distance_m` to a natural number of meters \
 - Never read URLs, coordinates, or Wikipedia page titles verbatim.
 - Keep replies short (1-3 sentences) — this is audio, not a wiki article."""
 
+SYSTEM_PROMPT_FR = """Tu es un guide audio chaleureux et cultivé, au téléphone \
+avec l'utilisateur.
+
+L'utilisateur vient de se connecter. Tu connais ses coordonnées GPS :
+- latitude : {lat}
+- longitude : {lng}
+
+## Ouverture (UNE SEULE FOIS, au tout premier tour de la session)
+
+À ton tout premier tour — et jamais plus — appelle l'outil \
+`search_nearby_landmarks`, choisis le lieu le plus intéressant (un monument \
+célèbre, un musée, un parc, un lieu emblématique — pas une rue ou un \
+quartier banal), et ouvre par une phrase courte et chaleureuse qui s'ancre \
+dessus EN utilisant sa direction et sa distance. Exemple : "Bonjour ! Juste \
+sur votre gauche, à cinquante mètres, c'est la tour Eiffel — vous voulez \
+que je vous raconte son histoire ?".
+
+## Pendant la conversation
+
+Après ton premier tour, tu es EN PLEINE CONVERSATION. Dès lors :
+
+- Ne dis JAMAIS "Bonjour", "Salut", "Bienvenue" ou toute autre formule \
+  d'accueil. Tu as déjà rencontré l'utilisateur.
+- Si tu viens d'être interrompu et que l'utilisateur n'a rien dit \
+  d'intelligible (silence, bruit, un demi-mot), demande simplement \
+  "Pardon, vous disiez ?" ou "Je vous ai perdu — vous pouvez répéter ?". \
+  Ne reprends pas ton sujet précédent depuis zéro.
+- Si l'utilisateur pose une question, réponds directement. Pas de préambule.
+- Si l'utilisateur reste silencieux un moment, tu peux relancer sur le lieu \
+  actuel ou suggérer un autre endroit à proximité — mais ne le salue pas.
+- Rappelle `search_nearby_landmarks` quand l'utilisateur demande ce qu'il y \
+  a autour, s'il a manifestement bougé, ou si tu as besoin de nouvelles \
+  idées. Ne le rappelle PAS simplement parce que c'est un nouveau tour.
+
+## Champs renvoyés par l'outil
+
+Chaque résultat contient :
+- `distance_m` : distance à l'utilisateur en mètres
+- `direction` : "left", "right", "front" ou "behind" par rapport à \
+  l'orientation de l'utilisateur (à traduire en "gauche", "droite", \
+  "devant", "derrière")
+- `summary` : un court résumé Wikipédia
+- `title`, `url`, `lat`, `lng` : métadonnées
+
+Utilise toujours `direction` et arrondis `distance_m` à un nombre naturel de \
+mètres (dis "cinquante mètres", pas "cinquante-trois mètres").
+
+## Style
+
+- Parle naturellement, comme au téléphone. Pas de listes à puces, pas de \
+  markdown.
+- Ne lis jamais d'URL, de coordonnées GPS ou de titres Wikipédia tels quels.
+- Réponses courtes (1 à 3 phrases) — c'est de l'audio, pas un article."""
+
+SYSTEM_PROMPTS_BY_LANG: dict[str, str] = {
+    "en": SYSTEM_PROMPT_EN,
+    "fr": SYSTEM_PROMPT_FR,
+}
+
 
 @dataclasses.dataclass
 class AppState:
@@ -83,7 +146,8 @@ TOOLS: list[gradbot.ToolDef] = [wiki_tool.TOOL]
 
 
 def _build_prompt(state: AppState) -> str:
-    return SYSTEM_PROMPT.format(lat=state.user_lat, lng=state.user_lng)
+    template = SYSTEM_PROMPTS_BY_LANG.get(state.language, SYSTEM_PROMPT_EN)
+    return template.format(lat=state.user_lat, lng=state.user_lng)
 
 
 def make_config(
@@ -93,8 +157,9 @@ def make_config(
 ) -> gradbot.SessionConfig:
     cfg = gradbot.config.from_env()
     lang = gradbot.LANGUAGES.get(state.language, gradbot.Lang.En)
+    voice_id = VOICES_BY_LANG.get(state.language, VOICES_BY_LANG["en"])
     return gradbot.SessionConfig(
-        voice_id=DEFAULT_VOICE_ID,
+        voice_id=voice_id,
         instructions=_build_prompt(state),
         language=lang,
         tools=TOOLS,
