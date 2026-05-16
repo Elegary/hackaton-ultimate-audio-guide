@@ -1,7 +1,8 @@
 .home {
   min-height: 100svh;
+  /* extra bottom padding so the fixed voice-dock never covers content when scrolled */
   padding: max(16px, env(safe-area-inset-top)) 16px
-    max(16px, env(safe-area-inset-bottom));
+    calc(max(16px, env(safe-area-inset-bottom)) + 96px);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -295,19 +296,37 @@
 .tour-card__meta .is-open  { color: #2f7a4f; }
 .tour-card__meta .is-closed { color: var(--route); }
 
-/* ============ VoiceCard ============ */
+/* ============ VoiceCard (docked, collapsible) ============ */
+
+.voice-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  padding: 0 12px max(12px, env(safe-area-inset-bottom));
+  pointer-events: none;
+}
 
 .voice {
+  pointer-events: auto;
+  max-width: 536px;
+  margin: 0 auto;
   background: var(--paper);
   color: var(--ink);
-  border-radius: 14px;
-  padding: 14px 16px 16px;
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 8px 14px 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   position: relative;
   overflow: hidden;
+  transition: padding 160ms ease;
+}
+
+.voice.is-expanded {
+  padding: 12px 14px 14px;
 }
 
 .voice::before {
@@ -332,23 +351,23 @@
 .voice__header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   position: relative;
 }
 
 .voice__persona {
   font-family: var(--serif);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--ink);
   letter-spacing: 0.01em;
-  font-variation-settings: 'opsz' 20;
+  font-variation-settings: 'opsz' 18;
 }
 
 .voice__state {
-  font-size: 11px;
+  font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   color: var(--route);
   margin-left: auto;
 }
@@ -358,13 +377,41 @@
   opacity: 0.7;
 }
 
+.voice__transcript-wrap {
+  position: relative;
+  cursor: pointer;
+  border-radius: 6px;
+  outline: none;
+}
+
+.voice__transcript-wrap:focus-visible {
+  outline: 2px solid var(--route);
+  outline-offset: 2px;
+}
+
+/* Collapsed: clamp visually to 2 lines max, fade tail */
+.voice:not(.is-expanded) .voice__transcript {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+/* Expanded: scrollable full block */
+.voice.is-expanded .voice__transcript {
+  max-height: 48vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .voice__transcript {
   margin: 0;
   font-family: var(--serif);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.4;
   color: var(--ink);
-  font-variation-settings: 'opsz' 18;
+  font-variation-settings: 'opsz' 14;
   position: relative;
 }
 
@@ -376,7 +423,7 @@
   font-style: normal;
   color: var(--ink-soft);
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .voice__transcript--user::before {

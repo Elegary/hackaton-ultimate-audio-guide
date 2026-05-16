@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, type KeyboardEvent } from 'react'
 import { useStore } from '../lib/store'
 import { AGENT_PERSONA } from '../lib/mock-backend'
 import type { VoiceStateValue } from '../lib/commands'
@@ -20,35 +20,73 @@ function lastBlock(transcript: TranscriptChunk[]): TranscriptChunk | null {
   return { speaker, text: transcript.slice(i).map((c) => c.text).join('') }
 }
 
+/**
+ * Last N sentences from a French text. Treats `.`, `!`, `?`, `…` as terminators
+ * and keeps any trailing partial sentence (the one being typed live).
+ */
+function lastNSentences(text: string, n: number): string {
+  if (!text) return ''
+  const sentences = text.match(/[^.!?…]+(?:[.!?…]+|$)/g)
+  if (!sentences) return text.trim()
+  return sentences.slice(-n).join('').trimStart()
+}
+
 export default function VoiceCard() {
   const state = useStore((s) => s.voiceState)
   const transcript = useStore((s) => s.transcript)
+  const [expanded, setExpanded] = useState(false)
   const block = useMemo(() => lastBlock(transcript), [transcript])
 
   const speaker = block?.speaker ?? 'agent'
   const personaName = speaker === 'agent' ? AGENT_PERSONA : 'Vous'
+  const fullText = block?.text.trim() ?? ''
+  const visibleText = expanded ? fullText : lastNSentences(fullText, 2)
+
+  const toggle = () => setExpanded((e) => !e)
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      toggle()
+    }
+  }
 
   return (
-    <section
-      className={`voice voice--${state}`}
-      aria-live="polite"
-      aria-atomic="false"
-    >
-      <header className="voice__header">
-        <VoiceIndicator state={state} />
-        <span className="voice__persona">{personaName}</span>
-        <span className="voice__state">{STATE_LABEL[state]}</span>
-      </header>
+    <div className="voice-dock" role="region" aria-label="Guide audio">
+      <section
+        className={`voice voice--${state}${expanded ? ' is-expanded' : ''}`}
+        aria-live="polite"
+        aria-atomic="false"
+      >
+        <header className="voice__header">
+          <VoiceIndicator state={state} />
+          <span className="voice__persona">{personaName}</span>
+          <span className="voice__state">{STATE_LABEL[state]}</span>
+        </header>
 
-      {block && block.text.trim() && (
-        <p
-          className={`voice__transcript voice__transcript--${speaker}`}
-          lang="fr"
-        >
-          {block.text}
-        </p>
-      )}
-    </section>
+        {visibleText && (
+          <div
+            className="voice__transcript-wrap"
+            role="button"
+            tabIndex={0}
+            onClick={toggle}
+            onKeyDown={onKey}
+            aria-expanded={expanded}
+            aria-label={
+              expanded
+                ? 'Réduire la transcription'
+                : 'Voir la transcription complète'
+            }
+          >
+            <p
+              className={`voice__transcript voice__transcript--${speaker}`}
+              lang="fr"
+            >
+              {visibleText}
+            </p>
+          </div>
+        )}
+      </section>
+    </div>
   )
 }
 
