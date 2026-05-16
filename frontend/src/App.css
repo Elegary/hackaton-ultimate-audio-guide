@@ -12,7 +12,7 @@
 
 .brand {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 12px;
   padding: 4px 4px 8px;
@@ -40,6 +40,49 @@
   font-size: 12px;
   letter-spacing: 0.02em;
 }
+
+.ws-pill {
+  grid-row: span 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+}
+
+.ws-pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.ws-pill--off {
+  color: #ff8a7a;
+  border-color: rgba(196, 69, 54, 0.45);
+}
+.ws-pill--off .ws-pill__dot { background: #c44536; }
+
+.ws-pill--connecting {
+  color: #f0c987;
+  border-color: rgba(240, 201, 135, 0.45);
+}
+.ws-pill--connecting .ws-pill__dot {
+  background: #f0c987;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.ws-pill--ready {
+  color: #5dd39e;
+  border-color: rgba(93, 211, 158, 0.45);
+}
+.ws-pill--ready .ws-pill__dot { background: #5dd39e; }
 
 .map-section {
   flex: 0 0 auto;

@@ -5,9 +5,15 @@ export function dispatchCommand(cmd: FrontendCommand) {
   const store = useStore.getState()
 
   switch (cmd.type) {
-    // Session lifecycle — not used yet, no-op
+    // Session lifecycle
     case 'session_ready':
+      store.setSessionReady(true)
+      // cmd.livekit will be wired when we add the audio hook
+      break
     case 'session_error':
+      store.setSessionReady(false)
+      console.error('Session error:', cmd.code, cmd.message)
+      break
     case 'pong':
       break
 
@@ -51,8 +57,10 @@ export function dispatchCommand(cmd: FrontendCommand) {
       break
 
     default: {
+      // Exhaustive at compile time. At runtime, unknown command types from
+      // the wire land here (forward-compat) — log and continue per spec.
       const _exhaustive: never = cmd
-      console.warn('Unknown command:', _exhaustive)
+      console.warn('Unknown WS command, ignored:', _exhaustive)
     }
   }
 }

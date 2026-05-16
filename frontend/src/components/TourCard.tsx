@@ -1,5 +1,4 @@
 import { useStore } from '../lib/store'
-import { mockBlurbFor } from '../lib/mock-backend'
 import type { Category, Direction } from '../lib/commands'
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -37,12 +36,10 @@ export default function TourCard() {
   if (!poi) {
     return (
       <article className="tour-card tour-card--empty">
-        <p>En attente de votre position…</p>
+        <p>En attente du backend…</p>
       </article>
     )
   }
-
-  const blurb = mockBlurbFor(poi.id)
 
   return (
     <article className="tour-card" aria-labelledby={`card-${poi.id}`}>
@@ -61,8 +58,6 @@ export default function TourCard() {
             {formatDistance(poi.distance_m)}
           </span>
         </div>
-
-        {blurb && <p className="tour-card__blurb">{blurb}</p>}
 
         <dl className="tour-card__meta">
           {typeof poi.rating === 'number' && (

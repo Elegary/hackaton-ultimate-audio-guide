@@ -7,6 +7,11 @@ export interface TranscriptChunk {
 }
 
 interface AppState {
+  // Session
+  sessionId: string | null
+  wsConnected: boolean
+  sessionReady: boolean
+
   // UI state driven by backend commands
   currentCard: POI | null
   highlightedPoiId: string | null
@@ -17,7 +22,10 @@ interface AppState {
   voiceState: VoiceStateValue
   transcript: TranscriptChunk[]
 
-  // Actions (called only via command-bus, never from components)
+  // Actions (called only via command-bus / app shell, never from presentational components)
+  setSessionId: (id: string | null) => void
+  setWsConnected: (v: boolean) => void
+  setSessionReady: (v: boolean) => void
   setCard: (poi: POI | null) => void
   setHighlightedPoi: (id: string | null) => void
   setView: (view: View) => void
@@ -27,6 +35,9 @@ interface AppState {
 }
 
 export const useStore = create<AppState>((set) => ({
+  sessionId: null,
+  wsConnected: false,
+  sessionReady: false,
   currentCard: null,
   highlightedPoiId: null,
   view: 'idle',
@@ -34,6 +45,9 @@ export const useStore = create<AppState>((set) => ({
   voiceState: 'idle',
   transcript: [],
 
+  setSessionId: (sessionId) => set({ sessionId }),
+  setWsConnected: (wsConnected) => set({ wsConnected }),
+  setSessionReady: (sessionReady) => set({ sessionReady }),
   setCard: (poi) => set({ currentCard: poi }),
   setHighlightedPoi: (id) => set({ highlightedPoiId: id }),
   setView: (view) => set({ view }),

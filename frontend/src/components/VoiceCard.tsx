@@ -1,8 +1,9 @@
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import { useStore } from '../lib/store'
-import { AGENT_PERSONA } from '../lib/mock-backend'
 import type { VoiceStateValue } from '../lib/commands'
 import type { TranscriptChunk } from '../lib/store'
+
+const AGENT_PERSONA = 'Emma'
 
 const STATE_LABEL: Record<VoiceStateValue, string> = {
   speaking: 'parle',
