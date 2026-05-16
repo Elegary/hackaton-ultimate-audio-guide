@@ -135,7 +135,11 @@ export function useWebSocket({
 
       const url = `${baseUrl}/ws/session/${sessionId}`
       const ws = new WebSocket(url)
-      ws.binaryType = 'arraybuffer'
+      // SyncedAudioPlayer.handleMessage checks `data instanceof Blob` for audio
+      // frames. Keep the browser default (`blob`) — switching to `arraybuffer`
+      // makes every binary frame fall through to onEvent and the audio never
+      // reaches the Opus decoder.
+      ws.binaryType = 'blob'
       wsRef.current = ws
 
       ws.onopen = () => {
