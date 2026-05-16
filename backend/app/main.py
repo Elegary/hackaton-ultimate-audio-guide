@@ -2,7 +2,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from app.config import settings
+# from app.config import settings
 from app.ws_handler import handle_guide_session
 
 app = FastAPI(title="Cicerone Backend")
