@@ -170,58 +170,83 @@
 
     function setStatus(s) { statusEl.textContent = s; }
 
-    function renderWikiResults(msg) {
-      const { search, results } = msg;
-      if (search) {
-        const headingTxt =
-          search.heading === null || search.heading === undefined
-            ? "no heading"
-            : `heading ${search.heading.toFixed(0)}° (${cardinal(search.heading)})`;
-        wikiSearchEl.textContent =
-          `Search @ ${search.lat.toFixed(5)}, ${search.lng.toFixed(5)}, ` +
-          `${headingTxt}, radius ${search.radius_m} m — ${results.length} result(s)`;
-      }
+    let queuePois = [];
+    let currentCard = null;
+
+    function poiSummary() {
+      const parts = [];
+      if (currentCard) parts.push(`card: ${currentCard.name}`);
+      parts.push(`queue: ${queuePois.length}`);
+      wikiSearchEl.textContent = parts.join(" · ");
+    }
+
+    function renderCardRow(poi) {
+      const li = document.createElement("li");
+      li.className = "wiki-card";
+
+      const h3 = document.createElement("h3");
+      const title = document.createElement("span");
+      title.textContent = poi.name;
+      const meta = document.createElement("span");
+      meta.className = "dist";
+      const dirTxt = poi.direction ? ` · ${poi.direction}` : "";
+      const bearingTxt =
+        typeof poi.bearing === "number" ? ` · ${poi.bearing.toFixed(0)}°` : "";
+      meta.textContent = `${poi.distance_m} m${dirTxt}${bearingTxt}`;
+      h3.append(title, meta);
+      li.appendChild(h3);
+
+      const idP = document.createElement("p");
+      idP.textContent = poi.id;
+      idP.style.fontSize = "0.78rem";
+      idP.style.color = "#888";
+      li.appendChild(idP);
+      return li;
+    }
+
+    function renderAll() {
       wikiResultsEl.innerHTML = "";
-      if (!results || results.length === 0) {
+      if (currentCard) {
+        const card = renderCardRow(currentCard);
+        card.style.borderColor = "#2563eb";
+        const tag = document.createElement("span");
+        tag.textContent = " · current card";
+        tag.style.color = "#2563eb";
+        tag.style.fontSize = "0.78rem";
+        card.querySelector("h3").appendChild(tag);
+        wikiResultsEl.appendChild(card);
+      }
+      for (const poi of queuePois) {
+        if (currentCard && poi.id === currentCard.id) continue;
+        wikiResultsEl.appendChild(renderCardRow(poi));
+      }
+      if (!currentCard && queuePois.length === 0) {
         const empty = document.createElement("li");
         empty.className = "wiki-empty";
-        empty.textContent = "No results.";
+        empty.textContent = "No card / queue yet.";
         wikiResultsEl.appendChild(empty);
-        return;
       }
-      for (const r of results) {
-        const li = document.createElement("li");
-        li.className = "wiki-card";
-
-        const h3 = document.createElement("h3");
-        const title = document.createElement("span");
-        title.textContent = r.title;
-        const meta = document.createElement("span");
-        meta.className = "dist";
-        const dirTxt = r.direction ? ` · ${r.direction}` : "";
-        const bearingTxt =
-          r.bearing !== undefined ? ` · ${r.bearing.toFixed(0)}°` : "";
-        meta.textContent = `${r.distance_m} m${dirTxt}${bearingTxt}`;
-        h3.append(title, meta);
-
-        const p = document.createElement("p");
-        p.textContent = r.summary || "(no summary)";
-
-        const a = document.createElement("a");
-        a.href = r.url;
-        a.target = "_blank";
-        a.rel = "noopener";
-        a.textContent = r.url;
-
-        li.append(h3, p, a);
-        wikiResultsEl.appendChild(li);
-      }
+      poiSummary();
     }
 
     function handleCustomMessage(msg) {
       switch (msg?.type) {
-        case "wikipedia_results":
-          renderWikiResults(msg);
+        case "display_card":
+        case "update_card":
+          currentCard = msg.poi;
+          renderAll();
+          break;
+        case "clear_card":
+          currentCard = null;
+          renderAll();
+          break;
+        case "set_queue":
+          queuePois = msg.activities || [];
+          renderAll();
+          break;
+        case "clear_queue":
+          queuePois = [];
+          renderAll();
           break;
         default:
           console.log("custom event", msg);

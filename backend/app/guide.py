@@ -10,6 +10,7 @@ import httpx
 from loguru import logger
 
 from app import geo
+from app.models import POI, ClearCard, ClearQueue, DisplayCard, SetQueue
 from app.tools import wikipedia as wiki_tool
 
 # Emma — English female voice. Swap via /api/voices catalog if needed.
@@ -140,18 +141,26 @@ async def on_tool_call(
             r["distance_m"] = int(round(distance))
             r["direction"] = geo.bearing_to_direction(bearing, state.user_heading)
 
-        await websocket.send_json(
-            {
-                "type": "wikipedia_results",
-                "search": {
-                    "lat": state.user_lat,
-                    "lng": state.user_lng,
-                    "heading": state.user_heading,
-                    "radius_m": int(radius_m),
-                },
-                "results": results,
-            }
-        )
+        pois = [
+            POI(
+                id=f"wikipedia:{r['title']}",
+                name=r["title"],
+                lat=r["lat"],
+                lng=r["lng"],
+                bearing=r["bearing"],
+                distance_m=r["distance_m"],
+                direction=r["direction"],
+                category="monument",
+            )
+            for r in results
+        ]
+
+        if pois:
+            await websocket.send_json(DisplayCard(poi=pois[0]).model_dump())
+            await websocket.send_json(SetQueue(activities=pois).model_dump())
+        else:
+            await websocket.send_json(ClearCard().model_dump())
+            await websocket.send_json(ClearQueue().model_dump())
 
         await handle.send_json({"results": results})
         return
