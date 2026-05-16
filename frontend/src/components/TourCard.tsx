@@ -3,19 +3,19 @@ import type { Category, Direction } from '../lib/commands'
 
 const CATEGORY_LABELS: Record<Category, string> = {
   monument: 'monument',
-  cafe: 'café',
+  cafe: 'cafe',
   restaurant: 'restaurant',
-  gallery: 'galerie',
-  shop: 'boutique',
-  park: 'parc',
-  other: 'lieu',
+  gallery: 'gallery',
+  shop: 'shop',
+  park: 'park',
+  other: 'place',
 }
 
 const DIRECTION_LABELS: Record<Direction, string> = {
-  front: 'devant vous',
-  behind: 'derrière vous',
-  left: 'à gauche',
-  right: 'à droite',
+  front: 'ahead',
+  behind: 'behind you',
+  left: 'to your left',
+  right: 'to your right',
 }
 
 const DIRECTION_ARROWS: Record<Direction, string> = {
@@ -36,7 +36,7 @@ export default function TourCard() {
   if (!poi) {
     return (
       <article className="tour-card tour-card--empty">
-        <p>En attente du backend…</p>
+        <p>Waiting for backend…</p>
       </article>
     )
   }
@@ -62,7 +62,7 @@ export default function TourCard() {
         <dl className="tour-card__meta">
           {typeof poi.rating === 'number' && (
             <div>
-              <dt>Note</dt>
+              <dt>Rating</dt>
               <dd>
                 {poi.rating.toFixed(1)}
                 {poi.user_ratings_total != null && (
@@ -73,15 +73,15 @@ export default function TourCard() {
           )}
           {typeof poi.price_level === 'number' && (
             <div>
-              <dt>Prix</dt>
+              <dt>Price</dt>
               <dd>{'€'.repeat(Math.max(1, poi.price_level))}</dd>
             </div>
           )}
           {typeof poi.is_open_now === 'boolean' && (
             <div>
-              <dt>Statut</dt>
+              <dt>Status</dt>
               <dd className={poi.is_open_now ? 'is-open' : 'is-closed'}>
-                {poi.is_open_now ? 'ouvert' : 'fermé'}
+                {poi.is_open_now ? 'open' : 'closed'}
               </dd>
             </div>
           )}

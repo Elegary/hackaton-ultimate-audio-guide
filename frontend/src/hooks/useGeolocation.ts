@@ -41,7 +41,7 @@ export function useGeolocation() {
     if (!('geolocation' in navigator)) {
       setState({
         fix: null,
-        error: 'Géolocalisation indisponible sur ce navigateur',
+        error: 'Geolocation not available in this browser',
         status: 'unsupported',
       })
       return

@@ -38,7 +38,7 @@ export default function App() {
       ? { lat: position.lat, lng: position.lng }
       : null,
     initialHeading: compass.heading,
-    language: 'fr',
+    language: 'en',
   })
 
   // Throttled position_update upstream so the backend keeps an up-to-date
@@ -58,11 +58,11 @@ export default function App() {
       <header className="brand">
         <span className="brand-mark" aria-hidden="true">◉</span>
         <h1>Orient</h1>
-        <p className="tagline">Votre guide audio piéton, en temps réel</p>
+        <p className="tagline">Your real-time walking audio guide</p>
         <WsStatusPill wsConnected={wsConnected} sessionReady={sessionReady} />
       </header>
 
-      <section className="map-section" aria-label="Carte">
+      <section className="map-section" aria-label="Map">
         <MapView position={position} heading={compass.heading} />
       </section>
 
@@ -81,11 +81,11 @@ export default function App() {
         </>
       ) : (
         <button type="button" className="cta" onClick={handleActivate}>
-          Activer position et boussole
+          Enable location and compass
         </button>
       )}
 
-      <footer className="footnote">v0 · déploiement Vercel · démo iOS</footer>
+      <footer className="footnote">v0 · Vercel preview · iOS demo</footer>
     </main>
   )
 }
@@ -97,12 +97,12 @@ interface WsStatusPillProps {
 
 function WsStatusPill({ wsConnected, sessionReady }: WsStatusPillProps) {
   const tone = !wsConnected ? 'off' : sessionReady ? 'ready' : 'connecting'
-  const label = !wsConnected ? 'hors-ligne' : sessionReady ? 'live' : 'connexion…'
+  const label = !wsConnected ? 'offline' : sessionReady ? 'live' : 'connecting…'
   return (
     <span
       className={`ws-pill ws-pill--${tone}`}
       role="status"
-      aria-label={`Backend : ${label}`}
+      aria-label={`Backend: ${label}`}
     >
       <span className="ws-pill__dot" aria-hidden="true" />
       {label}
@@ -134,7 +134,7 @@ function StatusPanel({
       </div>
       <div className="status-row">
         <span className={`status-dot status-${compassStatus}`} aria-hidden="true" />
-        <span className="status-label">Boussole</span>
+        <span className="status-label">Compass</span>
         <span className="status-value">{compassLabel(compassStatus, heading)}</span>
       </div>
     </section>
@@ -144,13 +144,13 @@ function StatusPanel({
 function geoLabel(status: GeoStatus, accuracy: number | null, error: string | null): string {
   switch (status) {
     case 'pending':
-      return 'localisation…'
+      return 'locating…'
     case 'granted':
       return accuracy ? `±${Math.round(accuracy)} m` : 'OK'
     case 'denied':
-      return error ?? 'refusée'
+      return error ?? 'denied'
     case 'unsupported':
-      return 'indisponible'
+      return 'unavailable'
     case 'idle':
       return '—'
   }
@@ -159,15 +159,15 @@ function geoLabel(status: GeoStatus, accuracy: number | null, error: string | nu
 function compassLabel(status: CompassStatus, heading: number | null): string {
   switch (status) {
     case 'pending':
-      return 'autorisation…'
+      return 'permission…'
     case 'granted':
-      return heading !== null ? `${Math.round(heading)}°` : 'en attente…'
+      return heading !== null ? `${Math.round(heading)}°` : 'waiting…'
     case 'denied':
-      return 'refusée'
+      return 'denied'
     case 'unsupported':
-      return 'indisponible'
+      return 'unavailable'
     case 'no-sensor':
-      return 'capteur absent'
+      return 'no sensor'
     case 'idle':
       return '—'
   }

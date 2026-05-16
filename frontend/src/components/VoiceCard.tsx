@@ -6,10 +6,10 @@ import type { TranscriptChunk } from '../lib/store'
 const AGENT_PERSONA = 'Emma'
 
 const STATE_LABEL: Record<VoiceStateValue, string> = {
-  speaking: 'parle',
-  listening: 'écoute',
-  thinking: 'réfléchit',
-  idle: 'prête',
+  speaking: 'speaking',
+  listening: 'listening',
+  thinking: 'thinking',
+  idle: 'ready',
 }
 
 /** Take the trailing run of same-speaker chunks (the "current line"). */
@@ -52,7 +52,7 @@ export default function VoiceCard() {
   }
 
   return (
-    <div className="voice-dock" role="region" aria-label="Guide audio">
+    <div className="voice-dock" role="region" aria-label="Audio guide">
       <section
         className={`voice voice--${state}${expanded ? ' is-expanded' : ''}`}
         aria-live="polite"
@@ -73,14 +73,12 @@ export default function VoiceCard() {
             onKeyDown={onKey}
             aria-expanded={expanded}
             aria-label={
-              expanded
-                ? 'Réduire la transcription'
-                : 'Voir la transcription complète'
+              expanded ? 'Collapse transcript' : 'Expand transcript'
             }
           >
             <p
               className={`voice__transcript voice__transcript--${speaker}`}
-              lang="fr"
+              lang="en"
             >
               {visibleText}
             </p>

@@ -10,12 +10,12 @@ const DIRECTION_ARROWS: Record<Direction, string> = {
 
 const CATEGORY_LABELS: Record<Category, string> = {
   monument: 'monument',
-  cafe: 'café',
+  cafe: 'cafe',
   restaurant: 'restaurant',
-  gallery: 'galerie',
-  shop: 'boutique',
-  park: 'parc',
-  other: 'lieu',
+  gallery: 'gallery',
+  shop: 'shop',
+  park: 'park',
+  other: 'place',
 }
 
 function formatDistance(m: number): string {
@@ -30,9 +30,9 @@ export default function ActivityQueue() {
   if (queue.length === 0) return null
 
   return (
-    <section className="queue" aria-label="À proximité">
+    <section className="queue" aria-label="Nearby">
       <header className="queue__header">
-        <h3>À proximité</h3>
+        <h3>Nearby</h3>
         <span className="queue__count">{queue.length}</span>
       </header>
 

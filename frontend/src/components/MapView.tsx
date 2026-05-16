@@ -56,7 +56,7 @@ export default function MapView({ position, heading }: MapViewProps) {
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     if (!apiKey) {
-      setError('VITE_GOOGLE_MAPS_API_KEY non défini — créez frontend/.env.local')
+      setError('VITE_GOOGLE_MAPS_API_KEY not set — create frontend/.env.local')
       return
     }
 

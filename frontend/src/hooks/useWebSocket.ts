@@ -42,7 +42,7 @@ export function useWebSocket({
   sessionId,
   initialPosition,
   initialHeading,
-  language = 'fr',
+  language = 'en',
 }: UseWebSocketArgs) {
   const wsRef = useRef<WebSocket | null>(null)
   const playerRef = useRef<SyncedAudioPlayer | null>(null)
