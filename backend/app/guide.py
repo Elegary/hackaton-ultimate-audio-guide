@@ -71,6 +71,7 @@ Always use `direction` and round `distance_m` to a natural number of meters \
 class AppState:
     """Per-session state held inside the WS handler."""
 
+    session_id: str = ""
     language: str = "en"
     user_lat: float = 0.0
     user_lng: float = 0.0

@@ -39,9 +39,12 @@ def _apply_position(state: guide.AppState, pos: dict) -> None:
         logger.warning("invalid position payload: {} ({})", pos, exc)
 
 
-@app.websocket("/ws/chat")
-async def ws_chat(websocket: fastapi.WebSocket) -> None:
-    state = guide.AppState()
+@app.websocket("/ws/session/{session_id}")
+async def ws_session(
+    websocket: fastapi.WebSocket, session_id: str
+) -> None:
+    state = guide.AppState(session_id=session_id)
+    logger.info("WS connect: session_id={}", session_id)
 
     async def on_start(msg: dict) -> gradbot.SessionConfig:
         _apply_position(
@@ -54,7 +57,8 @@ async def ws_chat(websocket: fastapi.WebSocket) -> None:
         )
         state.language = msg.get("language") or "en"
         logger.info(
-            "session start: lat={} lng={} heading={} lang={}",
+            "session start: id={} lat={} lng={} heading={} lang={}",
+            state.session_id,
             state.user_lat,
             state.user_lng,
             state.user_heading,
