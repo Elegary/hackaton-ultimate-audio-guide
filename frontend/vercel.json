@@ -1,0 +1,14 @@
+{
+  "regions": ["cdg1"],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self), microphone=(self)"
+        }
+      ]
+    }
+  ]
+}

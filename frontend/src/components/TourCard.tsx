@@ -1,0 +1,96 @@
+import { useStore } from '../lib/store'
+import type { Category, Direction } from '../lib/commands'
+
+const CATEGORY_LABELS: Record<Category, string> = {
+  monument: 'monument',
+  cafe: 'cafe',
+  restaurant: 'restaurant',
+  gallery: 'gallery',
+  shop: 'shop',
+  park: 'park',
+  other: 'place',
+}
+
+const DIRECTION_LABELS: Record<Direction, string> = {
+  front: 'ahead',
+  behind: 'behind you',
+  left: 'to your left',
+  right: 'to your right',
+}
+
+const DIRECTION_ARROWS: Record<Direction, string> = {
+  front: '↑',
+  behind: '↓',
+  left: '←',
+  right: '→',
+}
+
+function formatDistance(m: number): string {
+  if (m < 1000) return `${Math.round(m)} m`
+  return `${(m / 1000).toFixed(1)} km`
+}
+
+export default function TourCard() {
+  const poi = useStore((s) => s.currentCard)
+
+  if (!poi) {
+    return (
+      <article className="tour-card tour-card--empty">
+        <p>Waiting for backend…</p>
+      </article>
+    )
+  }
+
+  return (
+    <article className="tour-card" aria-labelledby={`card-${poi.id}`}>
+      {poi.photo_url && (
+        <div className="tour-card__media">
+          <img src={poi.photo_url} alt="" loading="eager" />
+          <span className="tour-card__chip">{CATEGORY_LABELS[poi.category]}</span>
+        </div>
+      )}
+
+      <div className="tour-card__body">
+        <div className="tour-card__heading">
+          <h2 id={`card-${poi.id}`}>{poi.name}</h2>
+          <span className="tour-card__direction" aria-label={DIRECTION_LABELS[poi.direction]}>
+            <span aria-hidden="true">{DIRECTION_ARROWS[poi.direction]}</span>
+            {formatDistance(poi.distance_m)}
+          </span>
+        </div>
+
+        {poi.description && (
+          <p className="tour-card__description">{poi.description}</p>
+        )}
+
+        <dl className="tour-card__meta">
+          {typeof poi.rating === 'number' && (
+            <div>
+              <dt>Rating</dt>
+              <dd>
+                {poi.rating.toFixed(1)}
+                {poi.user_ratings_total != null && (
+                  <span className="tour-card__meta-sub"> · {poi.user_ratings_total}</span>
+                )}
+              </dd>
+            </div>
+          )}
+          {typeof poi.price_level === 'number' && (
+            <div>
+              <dt>Price</dt>
+              <dd>{'€'.repeat(Math.max(1, poi.price_level))}</dd>
+            </div>
+          )}
+          {typeof poi.is_open_now === 'boolean' && (
+            <div>
+              <dt>Status</dt>
+              <dd className={poi.is_open_now ? 'is-open' : 'is-closed'}>
+                {poi.is_open_now ? 'open' : 'closed'}
+              </dd>
+            </div>
+          )}
+        </dl>
+      </div>
+    </article>
+  )
+}
