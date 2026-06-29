@@ -1,0 +1,13 @@
+# Copy to config.yaml and fill in your keys.
+# config.yaml is gitignored. Env vars override anything set here.
+
+llm:
+  model: "gpt-4o-mini"
+  base_url: "https://api.openai.com/v1"
+  api_key: "sk-..."
+
+gradium:
+  api_key: "gsk_..."
+
+session:
+  assistant_speaks_first: true

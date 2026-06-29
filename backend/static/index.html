@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cicerone — Audio + GPS test</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 4rem;
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.4rem; margin: 0 0 1rem; }
+    .row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    button {
+      font-size: 1.1rem;
+      padding: 0.7rem 1.4rem;
+      border-radius: 999px;
+      border: 0;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.stop { background: #dc2626; }
+    .meta { color: #666; font-size: 0.9rem; }
+    .panel {
+      margin-top: 1rem;
+      padding: 0.8rem 1rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: rgba(127, 127, 127, 0.04);
+    }
+    #transcript {
+      min-height: 240px;
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+    .msg { margin: 0.4rem 0; line-height: 1.4; }
+    .msg-text { display: inline-block; padding: 0.4rem 0.8rem; border-radius: 12px; }
+    .msg-user { text-align: right; }
+    .msg-user .msg-text { background: #2563eb; color: white; }
+    .msg-agent { text-align: left; }
+    .msg-agent .msg-text { background: #e5e7eb; color: #111; }
+
+    details.debug { margin-top: 1rem; }
+    details.debug > summary {
+      cursor: pointer;
+      font-weight: 600;
+      padding: 0.4rem 0;
+    }
+    .wiki-list { margin: 0; padding: 0; list-style: none; }
+    .wiki-card {
+      padding: 0.6rem 0.8rem;
+      margin: 0.4rem 0;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: rgba(127, 127, 127, 0.04);
+    }
+    .wiki-card h3 {
+      margin: 0 0 0.2rem;
+      font-size: 0.95rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .wiki-card h3 .dist { color: #666; font-weight: 400; font-size: 0.85rem; }
+    .wiki-card p { margin: 0.3rem 0; font-size: 0.85rem; line-height: 1.35; }
+    .wiki-card a { font-size: 0.8rem; color: #2563eb; }
+    .wiki-empty { color: #666; font-style: italic; }
+    .wiki-search-meta { font-size: 0.8rem; color: #666; margin-bottom: 0.3rem; }
+  </style>
+</head>
+<body>
+  <h1>Cicerone — Audio + GPS test</h1>
+
+  <div class="row">
+    <button id="btn">Start</button>
+    <label class="row" style="gap:0.4rem">
+      <input type="checkbox" id="echoCancellation" checked />
+      <span class="meta">Echo cancellation</span>
+    </label>
+  </div>
+
+  <div class="panel">
+    <label class="row" style="gap:0.5rem">
+      <span class="meta" style="min-width:7rem">Mock heading:</span>
+      <input
+        type="range"
+        id="headingMock"
+        min="0"
+        max="359"
+        value="0"
+        style="flex:1"
+      />
+      <span id="headingValue" class="meta" style="min-width:5.5rem; text-align:right">0° (N)</span>
+    </label>
+    <p class="meta" style="margin:0.3rem 0 0; font-size:0.78rem">
+      Used as heading when the device doesn't provide one (desktop, stationary phone).
+    </p>
+  </div>
+
+  <div class="panel">
+    <div id="status" class="meta">Ready.</div>
+    <div id="gps" class="meta">GPS: —</div>
+  </div>
+
+  <div id="transcript" class="panel"></div>
+
+  <details class="debug" open>
+    <summary>Debug — tool results</summary>
+    <div id="wiki-search" class="wiki-search-meta">No search yet.</div>
+    <ul id="wiki-results" class="wiki-list"></ul>
+  </details>
+
+  <script src="/static/js/opus-encoder.js"></script>
+  <script src="/static/js/audio-processor.js"></script>
+  <script src="/static/js/synced-audio-player.js"></script>
+  <script>
+    const btn = document.getElementById("btn");
+    const statusEl = document.getElementById("status");
+    const gpsEl = document.getElementById("gps");
+    const transcript = document.getElementById("transcript");
+    const echoEl = document.getElementById("echoCancellation");
+    const wikiSearchEl = document.getElementById("wiki-search");
+    const wikiResultsEl = document.getElementById("wiki-results");
+    const headingMockEl = document.getElementById("headingMock");
+    const headingValueEl = document.getElementById("headingValue");
+
+    const CARDINALS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+    function cardinal(deg) {
+      return CARDINALS[Math.round(((deg % 360) / 45)) % 8];
+    }
+    function refreshHeadingLabel() {
+      const v = parseFloat(headingMockEl.value);
+      headingValueEl.textContent = `${v.toFixed(0)}° (${cardinal(v)})`;
+    }
+    function sendPositionUpdate() {
+      if (ws?.readyState !== WebSocket.OPEN || !isRecording) return;
+      ws.send(JSON.stringify({
+        type: "position_update",
+        lat: currentLat,
+        lng: currentLng,
+        heading: parseFloat(headingMockEl.value),
+      }));
+    }
+    function schedulePositionUpdate() {
+      clearTimeout(posUpdateTimer);
+      posUpdateTimer = setTimeout(sendPositionUpdate, 150);
+    }
+    headingMockEl.addEventListener("input", () => {
+      refreshHeadingLabel();
+      schedulePositionUpdate();
+    });
+    refreshHeadingLabel();
+
+    let ws = null;
+    let player = null;
+    let isRecording = false;
+    let turnBubbles = {};
+    let userBubble = null;
+    let hadAssistantBubble = false;
+    let currentLat = 0;
+    let currentLng = 0;
+    let posUpdateTimer = null;
+
+    function setStatus(s) { statusEl.textContent = s; }
+
+    let queuePois = [];
+    let currentCard = null;
+
+    function poiSummary() {
+      const parts = [];
+      if (currentCard) parts.push(`card: ${currentCard.name}`);
+      parts.push(`queue: ${queuePois.length}`);
+      wikiSearchEl.textContent = parts.join(" · ");
+    }
+
+    function renderCardRow(poi) {
+      const li = document.createElement("li");
+      li.className = "wiki-card";
+
+      const h3 = document.createElement("h3");
+      const title = document.createElement("span");
+      title.textContent = poi.name;
+      const meta = document.createElement("span");
+      meta.className = "dist";
+      const dirTxt = poi.direction ? ` · ${poi.direction}` : "";
+      const bearingTxt =
+        typeof poi.bearing === "number" ? ` · ${poi.bearing.toFixed(0)}°` : "";
+      meta.textContent = `${poi.distance_m} m${dirTxt}${bearingTxt}`;
+      h3.append(title, meta);
+      li.appendChild(h3);
+
+      const idP = document.createElement("p");
+      idP.textContent = poi.id;
+      idP.style.fontSize = "0.78rem";
+      idP.style.color = "#888";
+      li.appendChild(idP);
+      return li;
+    }
+
+    function renderAll() {
+      wikiResultsEl.innerHTML = "";
+      if (currentCard) {
+        const card = renderCardRow(currentCard);
+        card.style.borderColor = "#2563eb";
+        const tag = document.createElement("span");
+        tag.textContent = " · current card";
+        tag.style.color = "#2563eb";
+        tag.style.fontSize = "0.78rem";
+        card.querySelector("h3").appendChild(tag);
+        wikiResultsEl.appendChild(card);
+      }
+      for (const poi of queuePois) {
+        if (currentCard && poi.id === currentCard.id) continue;
+        wikiResultsEl.appendChild(renderCardRow(poi));
+      }
+      if (!currentCard && queuePois.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "wiki-empty";
+        empty.textContent = "No card / queue yet.";
+        wikiResultsEl.appendChild(empty);
+      }
+      poiSummary();
+    }
+
+    function handleCustomMessage(msg) {
+      switch (msg?.type) {
+        case "display_card":
+        case "update_card":
+          currentCard = msg.poi;
+          renderAll();
+          break;
+        case "clear_card":
+          currentCard = null;
+          renderAll();
+          break;
+        case "set_queue":
+          queuePois = msg.activities || [];
+          renderAll();
+          break;
+        case "clear_queue":
+          queuePois = [];
+          renderAll();
+          break;
+        default:
+          console.log("custom event", msg);
+      }
+    }
+
+    function getBubbleForTurn(turnIdx, isUser) {
+      if (isUser) {
+        if (userBubble && !hadAssistantBubble) return userBubble;
+        hadAssistantBubble = false;
+        userBubble = document.createElement("div");
+        userBubble.className = "msg msg-user";
+        const tx = document.createElement("span");
+        tx.className = "msg-text";
+        userBubble.appendChild(tx);
+        transcript.appendChild(userBubble);
+        return userBubble;
+      }
+      let bubble = turnBubbles[turnIdx];
+      if (!bubble) {
+        hadAssistantBubble = true;
+        bubble = document.createElement("div");
+        bubble.className = "msg msg-agent";
+        const tx = document.createElement("span");
+        tx.className = "msg-text";
+        bubble.appendChild(tx);
+        transcript.appendChild(bubble);
+        turnBubbles[turnIdx] = bubble;
+      }
+      return bubble;
+    }
+
+    function appendTranscript(text, turnIdx, isUser) {
+      const bubble = getBubbleForTurn(turnIdx, isUser);
+      bubble.querySelector(".msg-text").textContent += text + " ";
+      while (transcript.children.length > 60) {
+        const removed = transcript.removeChild(transcript.firstChild);
+        for (const k in turnBubbles) { if (turnBubbles[k] === removed) delete turnBubbles[k]; }
+        if (userBubble === removed) userBubble = null;
+      }
+      transcript.scrollTop = transcript.scrollHeight;
+    }
+
+    function getPosition() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation API not available"));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            heading: pos.coords.heading,
+            accuracy: pos.coords.accuracy,
+          }),
+          (err) => reject(err),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      });
+    }
+
+    async function startCall() {
+      btn.disabled = true;
+      setStatus("Getting GPS…");
+
+      let pos;
+      try {
+        pos = await getPosition();
+        gpsEl.textContent =
+          `GPS: ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)} ` +
+          `(±${Math.round(pos.accuracy || 0)} m)`;
+      } catch (e) {
+        pos = { lat: 48.8566, lng: 2.3522, heading: null, accuracy: null };
+        gpsEl.textContent = `GPS denied — falling back to Paris (${pos.lat}, ${pos.lng})`;
+      }
+      currentLat = pos.lat;
+      currentLng = pos.lng;
+
+      setStatus("Initializing audio…");
+      const audioConfig = await fetch("/api/audio-config").then((r) => r.json());
+
+      player = new SyncedAudioPlayer({
+        basePath: "/static/js",
+        sampleRate: 24000,
+        pcmOutput: audioConfig.pcm || false,
+        echoCancellation: echoEl.checked,
+        onEncodedAudio: (data) => {
+          if (isRecording && ws?.readyState === WebSocket.OPEN) {
+            ws.send(data);
+          }
+        },
+        onText: ({ text, turnIdx, isUser }) => {
+          appendTranscript(text, turnIdx, isUser);
+        },
+        onEvent: (eventType, msg) => {
+          handleCustomMessage(msg);
+        },
+      });
+      await player.start();
+
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const sessionId =
+        (crypto.randomUUID && crypto.randomUUID()) ||
+        Math.random().toString(36).slice(2) + Date.now().toString(36);
+      ws = new WebSocket(`${proto}//${location.host}/ws/session/${sessionId}`);
+
+      ws.onopen = () => {
+        const heading = pos.heading ?? parseFloat(headingMockEl.value);
+        ws.send(JSON.stringify({
+          type: "start",
+          lat: pos.lat,
+          lng: pos.lng,
+          heading,
+          language: "en",
+        }));
+        isRecording = true;
+        setStatus("Connected. Speak.");
+        btn.textContent = "Stop";
+        btn.classList.add("stop");
+        btn.disabled = false;
+        btn.onclick = endCall;
+      };
+
+      ws.onmessage = (event) => player.handleMessage(event.data);
+      ws.onclose = endCall;
+      ws.onerror = (e) => {
+        console.error("WS error", e);
+        setStatus("WebSocket error.");
+      };
+    }
+
+    function endCall() {
+      isRecording = false;
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "stop" }));
+      }
+      ws?.close();
+      ws = null;
+      player?.stop();
+      player = null;
+      setStatus("Ended.");
+      btn.textContent = "Start";
+      btn.classList.remove("stop");
+      btn.disabled = false;
+      btn.onclick = startCall;
+    }
+
+    btn.onclick = startCall;
+  </script>
+</body>
+</html>
